@@ -6,7 +6,7 @@ import PlaybackControls from "@/components/PlaybackControls";
 import MetricGauge from "@/components/MetricGauge";
 import PhasePanel from "@/components/PhasePanel";
 import { useStore, type CameraPreset } from "@/store/useStore";
-import { SYMMETRY_GRADE_LABELS, type SymmetryGrade } from "@/data/analysisData";
+import { SYMMETRY_GRADE_COLORS, type SymmetryGrade } from "@/data/analysisData";
 
 const CAMERA_BUTTONS: { key: CameraPreset; label: string; icon: string }[] = [
   { key: "free", label: "自由", icon: "🔄" },
@@ -14,12 +14,6 @@ const CAMERA_BUTTONS: { key: CameraPreset; label: string; icon: string }[] = [
   { key: "side", label: "侧面", icon: "➡️" },
   { key: "top", label: "俯视", icon: "🔽" },
 ];
-
-const SYMMETRY_GRADE_COLORS: Record<SymmetryGrade, string> = {
-  symmetric: "#00ff88",
-  mild_asymmetry: "#ffaa00",
-  obvious_asymmetry: "#ff3366",
-};
 
 export default function Home() {
   const navigate = useNavigate();

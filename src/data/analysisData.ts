@@ -1,3 +1,5 @@
+import type { FrameAngles } from "@/data/poseData";
+
 export interface MetricResult {
   name: string;
   value: number;
@@ -26,6 +28,12 @@ export interface AnalysisResult {
 }
 
 export type SymmetryGrade = "symmetric" | "mild_asymmetry" | "obvious_asymmetry";
+
+export const SYMMETRY_GRADE_COLORS: Record<SymmetryGrade, string> = {
+  symmetric: "#00ff88",
+  mild_asymmetry: "#ffaa00",
+  obvious_asymmetry: "#ff3366",
+};
 
 export interface SymmetryResult {
   pairKey: string;
@@ -105,7 +113,7 @@ export function getSymmetryGrade(diff: number): SymmetryGrade {
   return "obvious_asymmetry";
 }
 
-export function computeSymmetry(angles: Record<string, number>): SymmetryResult[] {
+export function computeSymmetry(angles: FrameAngles): SymmetryResult[] {
   return SYMMETRY_PAIRS.map((pair) => {
     const leftValue = angles[pair.leftAngleKey] ?? 0;
     const rightValue = angles[pair.rightAngleKey] ?? 0;

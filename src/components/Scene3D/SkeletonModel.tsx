@@ -3,7 +3,7 @@ import { useFrame, ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import { BONE_CONNECTIONS, type JointName, type JointPosition, type FrameAngles, type PhaseType } from "@/data/poseData";
-import { CONTRALATERAL_MAP, type SymmetryResult, computeSymmetry, SYMMETRY_GRADE_LABELS } from "@/data/analysisData";
+import { CONTRALATERAL_MAP, type SymmetryResult, computeSymmetry, SYMMETRY_GRADE_LABELS, SYMMETRY_GRADE_COLORS } from "@/data/analysisData";
 import { useStore } from "@/store/useStore";
 
 const PROBLEM_JOINTS: Record<string, "danger" | "warning"> = {
@@ -75,12 +75,6 @@ type AngleInfoMap = Record<string, Array<{ label: string; value: string; color: 
 const AngleInfoContext = createContext<AngleInfoMap>({});
 
 const SymmetryDataContext = createContext<SymmetryResult[]>([]);
-
-const SYMMETRY_GRADE_COLORS: Record<string, string> = {
-  symmetric: "#00ff88",
-  mild_asymmetry: "#ffaa00",
-  obvious_asymmetry: "#ff3366",
-};
 
 function useJointAngleInfo(angles: FrameAngles | undefined): AngleInfoMap {
   return useMemo(() => {
@@ -692,7 +686,7 @@ export default function SkeletonModel() {
   const frameData = poseData.frames[currentFrame % poseData.totalFrames];
   const angleInfo = useJointAngleInfo(frameData.angles);
   const symmetryData = useMemo(
-    () => computeSymmetry(frameData.angles as unknown as Record<string, number>),
+    () => computeSymmetry(frameData.angles),
     [frameData.angles]
   );
 

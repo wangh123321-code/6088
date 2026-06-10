@@ -88,7 +88,7 @@ export const useStore = create<AppState>((set, get) => ({
   getSymmetryResults: () => {
     const state = get();
     const frame = state.poseData.frames[state.currentFrame % state.poseData.totalFrames];
-    return computeSymmetry(frame.angles as unknown as Record<string, number>);
+    return computeSymmetry(frame.angles);
   },
   getContralateralJoint: (joint: string) => {
     return CONTRALATERAL_MAP[joint];
