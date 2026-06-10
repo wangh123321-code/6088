@@ -3,6 +3,7 @@ import { useFrame, ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import { BONE_CONNECTIONS, type JointName, type JointPosition, type FrameAngles, type PhaseType } from "@/data/poseData";
+import { CONTRALATERAL_MAP, type SymmetryResult, computeSymmetry, SYMMETRY_GRADE_LABELS } from "@/data/analysisData";
 import { useStore } from "@/store/useStore";
 
 const PROBLEM_JOINTS: Record<string, "danger" | "warning"> = {
@@ -73,6 +74,14 @@ type AngleInfoMap = Record<string, Array<{ label: string; value: string; color: 
 
 const AngleInfoContext = createContext<AngleInfoMap>({});
 
+const SymmetryDataContext = createContext<SymmetryResult[]>([]);
+
+const SYMMETRY_GRADE_COLORS: Record<string, string> = {
+  symmetric: "#00ff88",
+  mild_asymmetry: "#ffaa00",
+  obvious_asymmetry: "#ff3366",
+};
+
 function useJointAngleInfo(angles: FrameAngles | undefined): AngleInfoMap {
   return useMemo(() => {
     if (!angles) return {};
@@ -130,8 +139,14 @@ function JointSphere({ position, name, scale = 1 }: { position: JointPosition; n
   const selectedJoint = useStore((s) => s.selectedJoint);
   const setSelectedJoint = useStore((s) => s.setSelectedJoint);
   const isSelected = selectedJoint === name;
+  const isContralateral = selectedJoint !== null && CONTRALATERAL_MAP[selectedJoint] === name;
   const angleInfo = useContext(AngleInfoContext);
   const jointInfo = angleInfo[name];
+  const symmetryData = useContext(SymmetryDataContext);
+  const symmetryForSelected = useMemo(() => {
+    if (!selectedJoint) return undefined;
+    return symmetryData.find((r) => r.leftJoint === selectedJoint || r.rightJoint === selectedJoint);
+  }, [selectedJoint, symmetryData]);
 
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
@@ -141,10 +156,13 @@ function JointSphere({ position, name, scale = 1 }: { position: JointPosition; n
   useFrame((state) => {
     if (meshRef.current) {
       const pulse = isProblem ? 1 + Math.sin(state.clock.elapsedTime * 4) * 0.15 : 1;
-      const selectScale = isSelected ? 1.4 : 1;
+      const selectScale = isSelected ? 1.4 : isContralateral ? 1.2 : 1;
       meshRef.current.scale.setScalar(finalScale * pulse * selectScale);
     }
   });
+
+  const emissiveIntensity = isProblem ? 1.2 : isSelected ? 1.0 : isContralateral ? 0.9 : 0.4;
+  const displayColor = isContralateral ? "#c084fc" : color;
 
   return (
     <group>
@@ -158,9 +176,9 @@ function JointSphere({ position, name, scale = 1 }: { position: JointPosition; n
       >
         <sphereGeometry args={[1, 16, 16]} />
         <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={isProblem ? 1.2 : isSelected ? 1.0 : 0.4}
+          color={displayColor}
+          emissive={displayColor}
+          emissiveIntensity={emissiveIntensity}
           transparent
           opacity={0.95}
         />
@@ -180,10 +198,58 @@ function JointSphere({ position, name, scale = 1 }: { position: JointPosition; n
                 ))}
               </div>
             )}
+            {symmetryForSelected && (
+              <div className="mt-1.5 pt-1.5 border-t border-electric/20">
+                <div className="text-purple-400 font-display tracking-wider mb-0.5">
+                  对称性对比 · {symmetryForSelected.label}
+                </div>
+                <div className="text-gray-300 font-body space-y-0.5">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-500">左侧</span>
+                    <span className="text-blue-300">{symmetryForSelected.leftValue.toFixed(1)}°</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-500">右侧</span>
+                    <span className="text-purple-300">{symmetryForSelected.rightValue.toFixed(1)}°</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-500">差值</span>
+                    <span style={{ color: SYMMETRY_GRADE_COLORS[symmetryForSelected.grade] }}>
+                      {symmetryForSelected.diff.toFixed(1)}°
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-500">等级</span>
+                    <span style={{ color: SYMMETRY_GRADE_COLORS[symmetryForSelected.grade] }}>
+                      {symmetryForSelected.gradeLabel}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </Html>
       )}
-      {isProblem && !isSelected && (
+      {isContralateral && !isSelected && (
+        <Html position={[position.x, position.y + 0.07, position.z]} center distanceFactor={4}>
+          <div className="px-2 py-0.5 rounded-full text-[10px] font-display tracking-wider pointer-events-none whitespace-nowrap"
+               style={{
+                 color: "#c084fc",
+                 backgroundColor: "rgba(192,132,252,0.1)",
+                 border: "1px solid rgba(192,132,252,0.3)",
+                 textShadow: "0 0 6px rgba(192,132,252,0.6)",
+               }}>
+            对侧 · {JOINT_LABELS[name]}
+          </div>
+        </Html>
+      )}
+      {isContralateral && !isSelected && (
+        <mesh position={[position.x, position.y, position.z]} scale={finalScale * 2.2}>
+          <ringGeometry args={[0.8, 1, 32]} />
+          <meshBasicMaterial color="#c084fc" transparent opacity={0.25} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+      {isProblem && !isSelected && !isContralateral && (
         <mesh position={[position.x, position.y, position.z]} scale={finalScale * 2}>
           <ringGeometry args={[0.8, 1, 32]} />
           <meshBasicMaterial color={color} transparent opacity={0.15} side={THREE.DoubleSide} />
@@ -625,43 +691,49 @@ export default function SkeletonModel() {
   const showGhost = useStore((s) => s.showGhost);
   const frameData = poseData.frames[currentFrame % poseData.totalFrames];
   const angleInfo = useJointAngleInfo(frameData.angles);
+  const symmetryData = useMemo(
+    () => computeSymmetry(frameData.angles as unknown as Record<string, number>),
+    [frameData.angles]
+  );
 
   return (
     <AngleInfoContext.Provider value={angleInfo}>
-      <group>
-        {BONE_CONNECTIONS.map(([from, to]) => (
-          <BoneCylinder
-            key={`${from}-${to}`}
-            from={frameData.joints[from]}
-            to={frameData.joints[to]}
-            fromName={from}
-            toName={to}
-          />
-        ))}
-        {(Object.keys(frameData.joints) as JointName[]).map((name) => (
-          <JointSphere key={name} position={frameData.joints[name]} name={name} />
-        ))}
-        {showBodyMesh && (
-          <group>
-            <BodyMesh joints={frameData.joints} />
-            <HeadMesh joints={frameData.joints} />
-            {BODY_SEGMENTS.map(([from, to, radius]) => (
-              <BodySegmentMesh
-                key={`mesh-${from}-${to}`}
-                from={frameData.joints[from]}
-                to={frameData.joints[to]}
-                radius={radius}
-              />
-            ))}
-          </group>
-        )}
-        {showAngles && (
-          <AngleVisualizations joints={frameData.joints} angles={frameData.angles} />
-        )}
-        {showGhost && <IdealPoseGenerator />}
-        <GroundReactionForces joints={frameData.joints} phase={frameData.phase} />
-        <PhaseIndicator joints={frameData.joints} phase={frameData.phase} />
-      </group>
+      <SymmetryDataContext.Provider value={symmetryData}>
+        <group>
+          {BONE_CONNECTIONS.map(([from, to]) => (
+            <BoneCylinder
+              key={`${from}-${to}`}
+              from={frameData.joints[from]}
+              to={frameData.joints[to]}
+              fromName={from}
+              toName={to}
+            />
+          ))}
+          {(Object.keys(frameData.joints) as JointName[]).map((name) => (
+            <JointSphere key={name} position={frameData.joints[name]} name={name} />
+          ))}
+          {showBodyMesh && (
+            <group>
+              <BodyMesh joints={frameData.joints} />
+              <HeadMesh joints={frameData.joints} />
+              {BODY_SEGMENTS.map(([from, to, radius]) => (
+                <BodySegmentMesh
+                  key={`mesh-${from}-${to}`}
+                  from={frameData.joints[from]}
+                  to={frameData.joints[to]}
+                  radius={radius}
+                />
+              ))}
+            </group>
+          )}
+          {showAngles && (
+            <AngleVisualizations joints={frameData.joints} angles={frameData.angles} />
+          )}
+          {showGhost && <IdealPoseGenerator />}
+          <GroundReactionForces joints={frameData.joints} phase={frameData.phase} />
+          <PhaseIndicator joints={frameData.joints} phase={frameData.phase} />
+        </group>
+      </SymmetryDataContext.Provider>
     </AngleInfoContext.Provider>
   );
 }

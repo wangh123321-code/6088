@@ -25,6 +25,108 @@ export interface AnalysisResult {
   overallScore: number;
 }
 
+export type SymmetryGrade = "symmetric" | "mild_asymmetry" | "obvious_asymmetry";
+
+export interface SymmetryResult {
+  pairKey: string;
+  label: string;
+  leftJoint: string;
+  rightJoint: string;
+  leftAngleKey: string;
+  rightAngleKey: string;
+  leftValue: number;
+  rightValue: number;
+  diff: number;
+  grade: SymmetryGrade;
+  gradeLabel: string;
+}
+
+export const SYMMETRY_THRESHOLDS = {
+  symmetric: 3,
+  mild_asymmetry: 6,
+} as const;
+
+export const SYMMETRY_GRADE_LABELS: Record<SymmetryGrade, string> = {
+  symmetric: "对称",
+  mild_asymmetry: "轻度不对称",
+  obvious_asymmetry: "明显不对称",
+};
+
+export const SYMMETRY_PAIRS = [
+  {
+    pairKey: "knee_valgus",
+    label: "膝内扣",
+    leftJoint: "leftKnee",
+    rightJoint: "rightKnee",
+    leftAngleKey: "leftKneeValgus",
+    rightAngleKey: "rightKneeValgus",
+  },
+  {
+    pairKey: "hip_flexion",
+    label: "髋屈曲",
+    leftJoint: "leftHip",
+    rightJoint: "rightHip",
+    leftAngleKey: "leftHipFlexion",
+    rightAngleKey: "rightHipFlexion",
+  },
+  {
+    pairKey: "ankle_dorsiflexion",
+    label: "踝背屈",
+    leftJoint: "leftAnkle",
+    rightJoint: "rightAnkle",
+    leftAngleKey: "leftAnkleDorsiflexion",
+    rightAngleKey: "rightAnkleDorsiflexion",
+  },
+] as const;
+
+export type SymmetryPairKey = (typeof SYMMETRY_PAIRS)[number]["pairKey"];
+
+export const CONTRALATERAL_MAP: Record<string, string> = {
+  leftKnee: "rightKnee",
+  rightKnee: "leftKnee",
+  leftHip: "rightHip",
+  rightHip: "leftHip",
+  leftAnkle: "rightAnkle",
+  rightAnkle: "leftAnkle",
+  leftShoulder: "rightShoulder",
+  rightShoulder: "leftShoulder",
+  leftElbow: "rightElbow",
+  rightElbow: "leftElbow",
+  leftWrist: "rightWrist",
+  rightWrist: "leftWrist",
+  leftFoot: "rightFoot",
+  rightFoot: "leftFoot",
+};
+
+export function getSymmetryGrade(diff: number): SymmetryGrade {
+  const absDiff = Math.abs(diff);
+  if (absDiff <= SYMMETRY_THRESHOLDS.symmetric) return "symmetric";
+  if (absDiff <= SYMMETRY_THRESHOLDS.mild_asymmetry) return "mild_asymmetry";
+  return "obvious_asymmetry";
+}
+
+export function computeSymmetry(angles: Record<string, number>): SymmetryResult[] {
+  return SYMMETRY_PAIRS.map((pair) => {
+    const leftValue = angles[pair.leftAngleKey] ?? 0;
+    const rightValue = angles[pair.rightAngleKey] ?? 0;
+    const diff = Math.abs(leftValue - rightValue);
+    const grade = getSymmetryGrade(diff);
+    return {
+      pairKey: pair.pairKey,
+      label: pair.label,
+      leftJoint: pair.leftJoint,
+      rightJoint: pair.rightJoint,
+      leftAngleKey: pair.leftAngleKey,
+      rightAngleKey: pair.rightAngleKey,
+      leftValue,
+      rightValue,
+      diff,
+      grade,
+      gradeLabel: SYMMETRY_GRADE_LABELS[grade],
+    };
+  });
+}
+
 export function generateAnalysisData(): AnalysisResult {
   return {
     metrics: [

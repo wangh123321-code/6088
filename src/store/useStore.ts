@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { generatePoseData, type PoseFrame, type PhaseType, type JointName } from "@/data/poseData";
-import { generateAnalysisData, type AnalysisResult } from "@/data/analysisData";
+import { generateAnalysisData, type AnalysisResult, type SymmetryResult, computeSymmetry, CONTRALATERAL_MAP } from "@/data/analysisData";
 import { generateReportData, type ReportData } from "@/data/reportData";
 
 export type CameraPreset = "free" | "front" | "side" | "top";
@@ -38,6 +38,9 @@ interface AppState {
   setShowForceArrows: (show: boolean) => void;
   setFrameByPhase: (phase: PhaseType) => void;
   getCurrentFrameData: () => PoseFrame;
+  getSymmetryResults: () => SymmetryResult[];
+  getContralateralJoint: (joint: string) => string | undefined;
+  getSymmetryForJoint: (joint: string) => SymmetryResult | undefined;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -81,5 +84,17 @@ export const useStore = create<AppState>((set, get) => ({
   getCurrentFrameData: () => {
     const state = get();
     return state.poseData.frames[state.currentFrame % state.poseData.totalFrames];
+  },
+  getSymmetryResults: () => {
+    const state = get();
+    const frame = state.poseData.frames[state.currentFrame % state.poseData.totalFrames];
+    return computeSymmetry(frame.angles as unknown as Record<string, number>);
+  },
+  getContralateralJoint: (joint: string) => {
+    return CONTRALATERAL_MAP[joint];
+  },
+  getSymmetryForJoint: (joint: string) => {
+    const results = get().getSymmetryResults();
+    return results.find((r) => r.leftJoint === joint || r.rightJoint === joint);
   },
 }));

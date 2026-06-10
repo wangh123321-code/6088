@@ -1,11 +1,12 @@
 import { useNavigate } from "react-router-dom";
-import { Activity, Eye, EyeOff, Footprints, Ghost, ArrowUpRight } from "lucide-react";
+import { Activity, Eye, EyeOff, Footprints, Ghost, ArrowUpRight, ArrowLeftRight } from "lucide-react";
 import Scene3D from "@/components/Scene3D/Scene3D";
 import VideoUpload from "@/components/VideoUpload";
 import PlaybackControls from "@/components/PlaybackControls";
 import MetricGauge from "@/components/MetricGauge";
 import PhasePanel from "@/components/PhasePanel";
 import { useStore, type CameraPreset } from "@/store/useStore";
+import { SYMMETRY_GRADE_LABELS, type SymmetryGrade } from "@/data/analysisData";
 
 const CAMERA_BUTTONS: { key: CameraPreset; label: string; icon: string }[] = [
   { key: "free", label: "自由", icon: "🔄" },
@@ -13,6 +14,12 @@ const CAMERA_BUTTONS: { key: CameraPreset; label: string; icon: string }[] = [
   { key: "side", label: "侧面", icon: "➡️" },
   { key: "top", label: "俯视", icon: "🔽" },
 ];
+
+const SYMMETRY_GRADE_COLORS: Record<SymmetryGrade, string> = {
+  symmetric: "#00ff88",
+  mild_asymmetry: "#ffaa00",
+  obvious_asymmetry: "#ff3366",
+};
 
 export default function Home() {
   const navigate = useNavigate();
@@ -31,6 +38,11 @@ export default function Home() {
   const setShowGhost = useStore((s) => s.setShowGhost);
   const showForceArrows = useStore((s) => s.showForceArrows);
   const setShowForceArrows = useStore((s) => s.setShowForceArrows);
+  const selectedJoint = useStore((s) => s.selectedJoint);
+  const getSymmetryResults = useStore((s) => s.getSymmetryResults);
+  const getSymmetryForJoint = useStore((s) => s.getSymmetryForJoint);
+  const symmetryResults = isDataLoaded ? getSymmetryResults() : [];
+  const selectedSymmetry = selectedJoint && isDataLoaded ? getSymmetryForJoint(selectedJoint) : undefined;
 
   const overallScore = analysisData.overallScore;
   const scoreColor = overallScore >= 80 ? "#00ff88" : overallScore >= 60 ? "#ffaa00" : "#ff3366";
@@ -176,6 +188,111 @@ export default function Home() {
 
               <div className="border-t border-electric/10 pt-4">
                 <PhasePanel />
+              </div>
+
+              <div className="border-t border-electric/10 pt-4">
+                <h2 className="text-purple-400 font-display text-sm tracking-wider uppercase flex items-center gap-2">
+                  <ArrowLeftRight className="w-4 h-4" />
+                  左右对称性
+                </h2>
+                <div className="space-y-2.5 mt-3">
+                  {selectedSymmetry ? (
+                    <div
+                      className="rounded-xl p-3 transition-all duration-300"
+                      style={{
+                        backgroundColor: `${SYMMETRY_GRADE_COLORS[selectedSymmetry.grade]}08`,
+                        borderColor: `${SYMMETRY_GRADE_COLORS[selectedSymmetry.grade]}25`,
+                        borderWidth: 1,
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-gray-200 text-xs font-body">{selectedSymmetry.label}</span>
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[10px] font-display tracking-wider"
+                          style={{
+                            color: SYMMETRY_GRADE_COLORS[selectedSymmetry.grade],
+                            backgroundColor: `${SYMMETRY_GRADE_COLORS[selectedSymmetry.grade]}15`,
+                          }}
+                        >
+                          {selectedSymmetry.gradeLabel}
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-blue-300">左侧</span>
+                          <span className="text-blue-300 font-mono">{selectedSymmetry.leftValue.toFixed(1)}°</span>
+                        </div>
+                        <div className="h-1.5 bg-dark-700 rounded-full overflow-hidden relative">
+                          <div
+                            className="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
+                            style={{
+                              width: `${Math.min(Math.abs(selectedSymmetry.leftValue) / 50 * 100, 100)}%`,
+                              backgroundColor: "#93c5fd",
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-purple-300">右侧</span>
+                          <span className="text-purple-300 font-mono">{selectedSymmetry.rightValue.toFixed(1)}°</span>
+                        </div>
+                        <div className="h-1.5 bg-dark-700 rounded-full overflow-hidden relative">
+                          <div
+                            className="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
+                            style={{
+                              width: `${Math.min(Math.abs(selectedSymmetry.rightValue) / 50 * 100, 100)}%`,
+                              backgroundColor: "#c4b5fd",
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-xs pt-1 border-t border-white/5">
+                          <span className="text-gray-500">差值</span>
+                          <span
+                            className="font-mono"
+                            style={{ color: SYMMETRY_GRADE_COLORS[selectedSymmetry.grade] }}
+                          >
+                            {selectedSymmetry.diff.toFixed(1)}°
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {symmetryResults.map((sr) => (
+                        <div
+                          key={sr.pairKey}
+                          className="rounded-lg p-2.5 transition-all duration-200"
+                          style={{
+                            backgroundColor: `${SYMMETRY_GRADE_COLORS[sr.grade]}05`,
+                            borderColor: `${SYMMETRY_GRADE_COLORS[sr.grade]}15`,
+                            borderWidth: 1,
+                          }}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-gray-300 text-xs font-body">{sr.label}</span>
+                            <span
+                              className="px-1.5 py-0.5 rounded text-[9px] font-display tracking-wider"
+                              style={{
+                                color: SYMMETRY_GRADE_COLORS[sr.grade],
+                                backgroundColor: `${SYMMETRY_GRADE_COLORS[sr.grade]}15`,
+                              }}
+                            >
+                              {sr.gradeLabel}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                            <span>左 {sr.leftValue.toFixed(1)}°</span>
+                            <span className="text-gray-600">vs</span>
+                            <span>右 {sr.rightValue.toFixed(1)}°</span>
+                            <span className="ml-auto font-mono" style={{ color: SYMMETRY_GRADE_COLORS[sr.grade] }}>
+                              Δ{sr.diff.toFixed(1)}°
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      <p className="text-[10px] text-gray-600 text-center">点击关节查看详细对比</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
